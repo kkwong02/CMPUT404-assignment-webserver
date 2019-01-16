@@ -1,5 +1,6 @@
 #  coding: utf-8
 import socketserver
+from pathlib import Path
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -29,6 +30,7 @@ import socketserver
 # defining constants
 ENCODING = "utf-8"  # encoding
 VERSION = "HTTP/1.1"  # HTTP version
+WWW = "www"  # the www directory
 
 
 class Status:
@@ -45,10 +47,12 @@ class Response:
     status_line = None
     content = None
     content_type = "text/plain"
-
-    def __init__(self, **kwargs):
+    request = None
+ 
+    def __init__(self, request, **kwargs):
+        self.request = request
         self.status = kwargs.get("status", Status.OK)
-        self.content = kwargs.get("content", None)
+        self.content = kwargs.get("content", '')
         self.content_type = kwargs.get("content_type", "text/plain")
         self.headers = (kwargs.get("headers"), None)
 
@@ -59,28 +63,43 @@ class Response:
         "Content-Type: %s \n " % (self.content_type)
         return bytearray(self.content, ENCODING)
 
+    def send(self):
+        self.request.sendall(self.getHeader())
+        if self.content:
+            self.request.sendall(self.getContent())
+
 
 class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         
-        # parse the request
-        request_info = self.data.decode('utf-8').split()[:2]
-        print("%s %s" % (request_info[0], request_info[1]))
+        print(self.data.decode(ENCODING))
+
+        request_info = self.data.decode(ENCODING).split()[:2]
 
         if request_info[0] != "GET":
             response = Response(
-                status=Status.METHOD_NOT_ALLOWED, 
-                content=Status.METHOD_NOT_ALLOWED
+                self.request,
+                status=Status.METHOD_NOT_ALLOWED
                 )
         
         else:
-            f = open("www/index.html")
-            response = Response(content=f.read(), content_type="text/html")
+            if request_info[1].endswith('/'):
+                # try to find index.html
+                try:
+                    index = open(WWW + request_info[1]+ "index.html")
+                    # ???? idk what to do here
+                except IOError:
+                    return
+                    
+                response = Response(
+                    self.request,
+                    status=Status.OK,
+                    content=index.read(),
+                    content_type="text/html"
+                )
         
-        # send the response.
-        self.request.sendall(response.getHeader())
-        self.request.sendall(response.getContent())
+        response.send()
 
 
 if __name__ == "__main__":
@@ -89,6 +108,8 @@ if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     # Create the server, binding to localhost on port 8080
     server = socketserver.TCPServer((HOST, PORT), MyWebServer)
+
+    print("Serving HTTP on %s port %d ..." % (HOST, PORT))
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
