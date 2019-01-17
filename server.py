@@ -54,37 +54,40 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 # try to find index.html
                 try:
                     index = open(WWW + request_info[1] + "index.html")
+                    response = Response(
+                        self.request,
+                        status=Status.OK,
+                        content=index.read(),
+                        headers={"Content-Type": "text/html"}
+                    )
                 except IOError:
-                    # TODO: Do something if index doesn't exit!
-                    return
-
-                response = Response(
-                    self.request,
-                    status=Status.OK,
-                    content=index.read(),
-                    headers={"Content-Type": "text/html"}
-                )
+                    response = NotFound(request=self.request)
 
             else:
                 path = Path(WWW + request_info[1])
-                if path.is_dir:
-                    response = Response(status=Status.MOVED_PERMANENTLY)
+                if path.is_dir():
+                    response = Response(
+                        request=self.request,
+                        status=Status.MOVED_PERMANENTLY,
+                        headers={
+                            "Location": request_info[1] + '/'
+                        }
+                        )
 
                 elif path.is_file():
                     contents = path.open()
                     mime = magic.Magic(mime=True)
-                    {
-                        "Content-Type": mime.from_buffer(contents)
-                    }
                    
                     response = Response(
-                        self.request, 
-                        content=contents,
-                        
+                        self.request,
+                        content=contents.read(),
+                        headers={
+                            "Content-Type": mime.from_file(WWW+request_info[1])
+                            }
                         )
                     
                 else:
-                    response = NotFound()
+                    response = NotFound(request=self.request)
 
         response.send()
 

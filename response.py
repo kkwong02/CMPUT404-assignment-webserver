@@ -1,3 +1,8 @@
+from datetime import datetime
+import locale
+
+locale.setlocale(locale.LC_TIME, 'en_US.utf-8')
+
 # defining constants
 ENCODING = "utf-8"  # encoding
 VERSION = "HTTP/1.1"  # HTTP version
@@ -7,7 +12,7 @@ class Status:
     METHOD_NOT_ALLOWED = "405 Method Not Allowed"
     NOT_FOUND = "404 Not Found"
     OK = "200 OK"
-    MOVED_PERMANENTLY = "301 Moved Permanently" # need Location header
+    MOVED_PERMANENTLY = "301 Moved Permanently"  # need Location header
 
 
 # Response
@@ -16,7 +21,6 @@ class Status:
 # status: status code and text. as a string
 # content: Content to be sent in response
 # request: the origin request
-# headers: a dictionary containing general header, response header and entity
 # header fields.
 class Response:
     # content-type
@@ -30,15 +34,27 @@ class Response:
  
     def __init__(self, request, **kwargs):
         self.request = request
-        self.status = kwargs.get("status", Status.OK)
-        self.content = kwargs.get("content", '')
-        self.headers = (kwargs.get("headers"), {})
+
+        if "status" in kwargs:
+            self.status = kwargs.get("status")
+        
+        if "content" in kwargs:
+            self.content = kwargs.get("content")
+        
+        self.headers = kwargs.get("headers", dict())
+
+        self.headers["Date"] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
 
     # getHeader()
     # creates header of HTTP response
     # combines status and headers into a bytearray that can be sent
     def getHeader(self):
-        return bytearray("%s %s \r\n\r\n" % (VERSION, self.status), ENCODING)
+        status_line = "%s %s \r\n" % (VERSION, self.status)
+        headers = ""
+        for field, value in self.headers.items():
+            headers += "%s : %s\n" % (field, value)
+
+        return bytearray("%s%s\r\n\r\n" % (status_line, headers), ENCODING)
     
     # getContent()
     # returns message-body of response as bytearray
@@ -49,6 +65,7 @@ class Response:
     # combines headers and content and sends response.
     def send(self):
         self.request.sendall(self.getHeader())
+
         if self.content:
             self.request.sendall(self.getContent())
 
