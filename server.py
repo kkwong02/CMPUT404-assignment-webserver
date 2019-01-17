@@ -2,6 +2,8 @@
 import socketserver
 from pathlib import Path
 
+import magic
+
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +39,7 @@ class Status:
     METHOD_NOT_ALLOWED = "405 Method Not Allowed"
     NOT_FOUND = "404 Not Found"
     OK = "200 OK"
+    MOVED_PERMANENTLY = "301 Moved Permanently" # need Location header
 
 
 class Response:
@@ -44,29 +47,37 @@ class Response:
     # Date RFC 1123
     # Expect
 
-    status_line = None
+    status = None
     content = None
-    content_type = "text/plain"
     request = None
+    headers = None
  
     def __init__(self, request, **kwargs):
         self.request = request
         self.status = kwargs.get("status", Status.OK)
         self.content = kwargs.get("content", '')
-        self.content_type = kwargs.get("content_type", "text/plain")
-        self.headers = (kwargs.get("headers"), None)
+        self.headers = (kwargs.get("headers"), {})
 
     def getHeader(self):
         return bytearray("%s %s \r\n\r\n" % (VERSION, self.status), ENCODING)
     
     def getContent(self):
-        "Content-Type: %s \n " % (self.content_type)
         return bytearray(self.content, ENCODING)
 
     def send(self):
         self.request.sendall(self.getHeader())
         if self.content:
             self.request.sendall(self.getContent())
+
+
+# Subclasses of Response for error messages
+class NotFound(Response):
+    status = Status.NOT_FOUND
+
+
+class MethodNotAllowed(Response):
+    status = Status.METHOD_NOT_ALLOWED
+    headers = {"Allow": "GET"}
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
@@ -87,18 +98,39 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if request_info[1].endswith('/'):
                 # try to find index.html
                 try:
-                    index = open(WWW + request_info[1]+ "index.html")
-                    # ???? idk what to do here
+                    index = open(WWW + request_info[1] + "index.html")
                 except IOError:
+                    # TODO: Do something if index doesn't exit!
                     return
-                    
+
                 response = Response(
                     self.request,
                     status=Status.OK,
                     content=index.read(),
-                    content_type="text/html"
+                    headers={"Content-Type": "text/html"}
                 )
-        
+
+            else:
+                path = Path(WWW + request_info[1])
+                if path.is_dir:
+                    response = Response(status=Status.MOVED_PERMANENTLY)
+
+                elif path.is_file():
+                    contents = path.open()
+                    mime = magic.Magic(mime=True)
+                    {
+                        "Content-Type": mime.from_buffer(contents)
+                    }
+                   
+                    response = Response(
+                        self.request, 
+                        content=contents,
+                        
+                        )
+                    
+                else:
+                    response = NotFound()
+
         response.send()
 
 
