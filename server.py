@@ -63,14 +63,19 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
             else:
                 path = Path(WWW + request_info[1])
-                if path.is_dir():
+                    
+                if Path(WWW).resolve() not in path.resolve().parents:
+                    print("NOT FOUND POSIX")
+                    response = NotFound(request=self.request)
+
+                elif path.is_dir():
                     response = Response(
                         request=self.request,
                         status=Status.MOVED_PERMANENTLY,
                         headers={
                             "Location": request_info[1] + '/'
                         }
-                        )
+                    )
 
                 elif path.is_file():
                     contents = path.open()
@@ -85,6 +90,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                         )
                     
                 else:
+                    print("NOT FOUND END")
                     response = NotFound(request=self.request)
 
         response.send()
