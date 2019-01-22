@@ -43,31 +43,28 @@ class Response:
         
         self.headers = kwargs.get("headers", dict())
 
+        self.headers["Server"] = "WebServer/0.0.1"
         self.headers["Date"] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
 
     # getHeader()
     # creates header of HTTP response
     # combines status and headers into a bytearray that can be sent
     def getHeader(self):
-        status_line = "%s %s \r\n" % (VERSION, self.status)
+        status_line = "%s %s\r\n" % (VERSION, self.status)
         headers = ""
         for field, value in self.headers.items():
-            headers += "%s : %s\n" % (field, value)
+            headers += "%s: %s\r\n" % (field, value)
 
-        return bytearray("%s%s\r\n\r\n" % (status_line, headers), ENCODING)
-    
-    # getContent()
-    # returns message-body of response as bytearray
-    def getContent(self):
-        return bytearray(self.content, ENCODING)
+        print("%s%s\r\n" % (status_line, headers))
+        return "%s%s\r\n" % (status_line, headers)
 
     # send()
     # combines headers and content and sends response.
     def send(self):
-        self.request.sendall(self.getHeader())
+        self.request.sendall(self.getHeader().encode(ENCODING))
 
         if self.content:
-            self.request.sendall(self.getContent())
+            self.request.sendall(self.content.encode(ENCODING))
 
 
 # Subclasses of Response for error messages
