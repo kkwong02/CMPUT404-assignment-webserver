@@ -2,9 +2,7 @@
 import socketserver
 from pathlib import Path
 
-import magic
-
-from response import Response, NotFound, MethodNotAllowed
+from response import Response, NotFound
 from response import ENCODING, Status
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
@@ -76,13 +74,13 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
                 elif path.is_file():
                     contents = path.open()
-                    mime = magic.Magic(mime=True)
                    
                     response = Response(
                         self.request,
+                        status=Status.OK,
                         content=contents.read(),
                         headers={
-                            "Content-Type": mime.from_file(WWW+request_info[1])
+                            "Content-Type": "text/" + path.suffix[1:] 
                             }
                         )
                     
