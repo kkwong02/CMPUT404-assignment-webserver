@@ -65,7 +65,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 path = Path(WWW + request_info[1])
                     
                 if Path(WWW).resolve() not in path.resolve().parents:
-                    print("NOT FOUND POSIX")
                     response = NotFound(request=self.request)
 
                 elif path.is_dir():
@@ -90,7 +89,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
                         )
                     
                 else:
-                    print("NOT FOUND END")
                     response = NotFound(request=self.request)
 
         response.send()
