@@ -49,17 +49,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         
         else:
             if request_info[1].endswith('/'):
-                # try to find index.html
-                try:
-                    index = open(WWW + request_info[1] + "index.html")
-                    response = Response(
-                        self.request,
-                        status=Status.OK,
-                        content=index.read(),
-                        headers={"Content-Type": "text/html"}
-                    )
-                except IOError:
-                    response = NotFound(request=self.request)
+                response = self.getFileResponse(Path(WWW + request_info[1] + "index.html"))
 
             else:
                 path = Path(WWW + request_info[1])
@@ -77,21 +67,28 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     )
 
                 elif path.is_file():
-                    contents = path.open()
-                   
-                    response = Response(
-                        self.request,
-                        status=Status.OK,
-                        content=contents.read(),
-                        headers={
-                            "Content-Type": "text/" + path.suffix[1:] 
-                            }
-                        )
+                    response = self.getFileResponse(path)
                     
                 else:
                     response = NotFound(request=self.request)
 
         response.send()
+
+    def getFileResponse(self, path):
+        try:
+            contents = path.open()
+
+        except FileExistsError:
+            return NotFound(self.request)
+
+        return Response(
+            self.request,
+            status=Status.OK,
+            content=contents.read(),
+            headers={
+                "Content-Type": "text/" + path.suffix[1:] 
+                }
+            )
 
 
 if __name__ == "__main__":
