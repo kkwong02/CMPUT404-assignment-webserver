@@ -72,7 +72,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         try:
             full_path = path.resolve()
         except FileNotFoundError:
-            pass
+            raise NotFoundError()
         
         # Check if path is in the www directory
         if Path(WWW).resolve() not in full_path.parents:
