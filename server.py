@@ -2,8 +2,10 @@
 import socketserver
 from pathlib import Path
 
-from response import Response, NotFound
+from response import Response, NotFound, MovedPermanently, MethodNotAllowed
 from response import ENCODING, Status
+
+from exceptions import NotFoundError, MovedPermanentlyError
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -42,51 +44,62 @@ class MyWebServer(socketserver.BaseRequestHandler):
         request_info = self.data.decode(ENCODING).split()[:2]
 
         if request_info[0] != "GET":
-            response = Response(
-                self.request,
-                status=Status.METHOD_NOT_ALLOWED
-                )
+            response = MethodNotAllowed(self.request)
         
         else:
-            if request_info[1].endswith('/'):
-                response = self.getFileResponse(Path(WWW + request_info[1] + "index.html"))
-
+            try:
+                path = self.getPath(request_info[1])
+            except NotFoundError:
+                response = NotFound(self.request)
+            except MovedPermanentlyError:
+                response = MovedPermanently(self.request, location=request_info[1] + "/")
             else:
-                path = Path(WWW + request_info[1])
-                    
-                if Path(WWW).resolve() not in path.resolve().parents:
-                    response = NotFound(request=self.request)
-
-                elif path.is_dir():
-                    response = Response(
-                        request=self.request,
-                        status=Status.MOVED_PERMANENTLY,
-                        headers={
-                            "Location": request_info[1] + '/'
-                        }
-                    )
-
-                elif path.is_file():
-                    response = self.getFileResponse(path)
-                    
-                else:
-                    response = NotFound(request=self.request)
+                response = self.getResponse(path)
 
         response.send()
 
-    def getFileResponse(self, path):
-        try:
-            contents = path.open()
+    # getPath(self url)
+    # returns a Path object for file to return.
+    # checks if the file exists and is in the www directory.
+    # raises NotFoundError if the file doesn't exist
+    # raises PermanentlyMovedError if path is a directory but does not end in /
+    def getPath(self, url):
+        path = Path(WWW + (url + "index.html" if url.endswith("/") else url))
 
+        # For compatiblity with python 3.5 (lab machines)
+        # python 3.6 (VM version) does not throw an error if file
+        # doesn't exist.
+        try:
+            full_path = path.resolve()
         except FileNotFoundError:
-            return NotFound(self.request)
+            pass
+        
+        # Check if path is in the www directory
+        if Path(WWW).resolve() not in full_path.parents:
+            raise NotFoundError()
+
+        # if path does not end with a / but is a directory
+        if path.is_dir():
+            raise MovedPermanentlyError()
+
+        if not path.is_file():
+            raise NotFoundError()
+
+        return path
+
+    # getResponse(self, path)
+    # creates a response object with a Path
+    # assumes that the path goes to a file that exists.
+    # TODO: catch file read errors
+    def getResponse(self, path):
+        contents = path.open().read()
 
         return Response(
             self.request,
             status=Status.OK,
-            content=contents.read(),
+            content=contents,
             headers={
-                "Content-Type": "text/" + path.suffix[1:] 
+                "Content-Type": "text/" + path.suffix[1:]
                 }
             )
 

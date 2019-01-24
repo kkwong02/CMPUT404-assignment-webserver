@@ -75,3 +75,16 @@ class NotFound(Response):
 class MethodNotAllowed(Response):
     status = Status.METHOD_NOT_ALLOWED
     headers = {"Allow": "GET"}
+
+
+class MovedPermanently(Response):
+    status = Status.MOVED_PERMANENTLY
+    
+    def __init__(self, request, **kwargs):
+        try:
+            location = kwargs.pop("location")
+        except KeyError as e:
+            raise KeyError("Location is required.") from e
+        else:
+            super().__init__(request, **kwargs)
+            self.headers["Location"] = location
