@@ -78,7 +78,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         try:
             contents = path.open()
 
-        except FileExistsError:
+        except FileNotFoundError:
             return NotFound(self.request)
 
         return Response(
