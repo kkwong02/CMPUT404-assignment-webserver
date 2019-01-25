@@ -51,8 +51,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 path = self.getPath(request_info[1])
             except NotFoundError:
                 response = NotFound(self.request)
-            except MovedPermanentlyError:
-                response = MovedPermanently(self.request, location=request_info[1] + "/")
+            except MovedPermanentlyError as e:
+                response = MovedPermanently(self.request, location=e.location)
             else:
                 response = self.getResponse(path)
 
@@ -64,25 +64,42 @@ class MyWebServer(socketserver.BaseRequestHandler):
     # raises NotFoundError if the file doesn't exist
     # raises PermanentlyMovedError if path is a directory but does not end in /
     def getPath(self, url):
-        path = Path(WWW + (url + "index.html" if url.endswith("/") else url))
+        www = Path(WWW)
+        path = Path(WWW + url)
 
-        # For compatiblity with python 3.5 (lab machines)
-        # python 3.6 (VM version) does not throw an error if file
-        # doesn't exist.
+        # done for compatibility with python 3.5, used on the lab machines.
+        # python 3.6 does not throw an error on resolve if path doesn't exist.
         try:
             full_path = path.resolve()
         except FileNotFoundError:
             raise NotFoundError()
-        
+
         # Check if path is in the www directory
-        if Path(WWW).resolve() not in full_path.parents:
+        if www.resolve() not in full_path.parents and path.resolve() != www.resolve():
+            print("not in www")
             raise NotFoundError()
 
-        # if path does not end with a / but is a directory
-        if path.is_dir():
-            raise MovedPermanentlyError()
+        # if the path contains .. but is still in www 
+        if '..' in path.parts:
+            redirect_url = str(path.resolve().relative_to(Path(WWW).resolve()))
 
+            if redirect_url == ".":
+               # it goes to the root directory
+                redirect_url = '/'
+            else:
+                redirect_url = "/" + redirect_url + "/"
+
+            raise MovedPermanentlyError(redirect_url)
+     
+        # handling directories
+        if path.is_dir() and not url.endswith('/'):
+            raise MovedPermanentlyError(url + '/')
+        elif path.is_dir():
+            path = path / Path("index.html")
+
+        # that the file actually exists
         if not path.is_file():
+            print("File not found")
             raise NotFoundError()
 
         return path

@@ -3,4 +3,6 @@ class NotFoundError(Exception):
 
 
 class MovedPermanentlyError(Exception):
-    pass
+    def __init__(self, location, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+        self.location = location
